@@ -1,0 +1,94 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat", "title": "Service Up", "id": 1,
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "up{job=\"music-metadata-service\"}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "value"}
+    },
+    {
+      "type": "stat", "title": "Request Rate", "id": 2,
+      "gridPos": {"h": 5, "w": 5, "x": 4, "y": 0},
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{application=\"music-metadata-service\"}[5m]))", "legendFormat": "req/s", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto"}
+    },
+    {
+      "type": "stat", "title": "P95 Latency", "id": 3,
+      "gridPos": {"h": 5, "w": 5, "x": 9, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"music-metadata-service\"}[5m])))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto"}
+    },
+    {
+      "type": "stat", "title": "Error Rate", "id": 4,
+      "gridPos": {"h": 5, "w": 5, "x": 14, "y": 0},
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{application=\"music-metadata-service\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"music-metadata-service\"}[5m])), 0.001)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "textMode": "auto"}
+    },
+    {
+      "type": "stat", "title": "DB Connections", "id": 5,
+      "gridPos": {"h": 5, "w": 5, "x": 19, "y": 0},
+      "targets": [{"expr": "hikaricp_connections_active{application=\"music-metadata-service\"}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "textMode": "auto"}
+    },
+    {
+      "type": "timeseries", "title": "HTTP Throughput by Endpoint", "id": 6,
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "targets": [{"expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"music-metadata-service\"}[5m]))", "legendFormat": "{{method}} {{uri}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []}, "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries", "title": "HTTP Latency Percentiles", "id": 7,
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"music-metadata-service\"}[5m])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"music-metadata-service\"}[5m])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"music-metadata-service\"}[5m])))", "legendFormat": "p99", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}, "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries", "title": "JVM Heap", "id": 8,
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 13},
+      "targets": [
+        {"expr": "sum(jvm_memory_used_bytes{application=\"music-metadata-service\",area=\"heap\"})", "legendFormat": "Used", "refId": "A"},
+        {"expr": "sum(jvm_memory_max_bytes{application=\"music-metadata-service\",area=\"heap\"})", "legendFormat": "Max", "refId": "B"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []}, "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries", "title": "Catalogue Operations", "id": 9,
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 13},
+      "targets": [
+        {"expr": "sum(rate(music_artists_created_total[5m]))", "legendFormat": "Artists created", "refId": "A"},
+        {"expr": "sum(rate(music_artists_renamed_total[5m]))", "legendFormat": "Artists renamed", "refId": "B"},
+        {"expr": "sum(rate(music_tracks_created_total[5m]))", "legendFormat": "Tracks created", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []}, "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries", "title": "Artist of the Day Requests", "id": 10,
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 13},
+      "targets": [{"expr": "sum(rate(music_artist_of_day_requests_total[5m]))", "legendFormat": "Requests", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []}, "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["music", "spring-boot", "production"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "browser",
+  "title": "Music Metadata Service",
+  "uid": "music-metadata-service",
+  "version": 1
+}

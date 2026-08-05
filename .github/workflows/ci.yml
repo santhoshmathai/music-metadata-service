@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify
+        run: mvn --batch-mode verify
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+      - name: Build runtime image
+        run: docker build --tag music-metadata-service:${{ github.sha }} .
