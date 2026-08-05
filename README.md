@@ -30,6 +30,7 @@ Services:
 |---|---|---|
 | API | http://localhost:8080 | Music metadata REST API |
 | Swagger UI | http://localhost:8080/swagger-ui.html | Interactive API documentation |
+| OpenAPI JSON | http://localhost:8080/api-docs | Machine-readable OpenAPI 3 document |
 | Health | http://localhost:8080/actuator/health | Liveness/readiness |
 | Prometheus | http://localhost:9090 | Metrics and queries |
 | Grafana | http://localhost:3000 | Provisioned operational dashboard |
@@ -49,6 +50,8 @@ docker compose down --volumes
 ```
 
 ## API examples
+
+The Swagger UI documents request validation, response schemas, pagination, and error responses for every API operation. The raw OpenAPI document is available from `/api-docs` for client generation and API tooling.
 
 Create an artist:
 

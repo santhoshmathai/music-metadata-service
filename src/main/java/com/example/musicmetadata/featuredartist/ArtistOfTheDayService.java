@@ -5,6 +5,7 @@ import com.example.musicmetadata.artist.ArtistDtos.ArtistResponse;
 import com.example.musicmetadata.artist.ArtistRepository;
 import com.example.musicmetadata.common.ResourceNotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,5 +57,8 @@ public class ArtistOfTheDayService {
         return features.save(new ArtistDailyFeature(date, next));
     }
 
-    public record ArtistOfTheDayResponse(LocalDate date, ArtistResponse artist) {}
+    @Schema(description = "Artist selected for a UTC calendar date")
+    public record ArtistOfTheDayResponse(
+            @Schema(example = "2026-08-05") LocalDate date,
+            ArtistResponse artist) {}
 }
