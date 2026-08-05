@@ -1,0 +1,576 @@
+openapi: 3.0.3
+info:
+  title: Music Metadata API
+  version: 1.0.0
+  description: |
+    REST API for managing artist and track metadata and retrieving the rotating
+    Artist of the Day.
+
+    All requests and responses use JSON. Dates use ISO 8601 format (`YYYY-MM-DD`),
+    timestamps use ISO 8601 UTC format, and identifiers are UUIDs.
+  contact:
+    name: Music Metadata Service
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Artists
+    description: Create and rename catalogue artists.
+  - name: Tracks
+    description: Add and list tracks belonging to an artist.
+  - name: Artist of the Day
+    description: Retrieve the artist selected by the daily fair rotation.
+
+paths:
+  /api/v1/artists:
+    post:
+      tags: [Artists]
+      operationId: createArtist
+      summary: Create an artist
+      description: Creates an artist with an optional list of alternative or historical names.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtistRequest'
+            examples:
+              withAliases:
+                summary: Artist with an alias
+                value:
+                  name: Daft Punk
+                  aliases:
+                    - Darlin'
+              withoutAliases:
+                summary: Artist without aliases
+                value:
+                  name: Justice
+      responses:
+        '201':
+          description: Artist created successfully.
+          headers:
+            Location:
+              description: URL of the created artist.
+              schema:
+                type: string
+                format: uri
+              example: http://localhost:8080/api/v1/artists/de305d54-75b4-431b-adb2-eb6b9e546014
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistResponse'
+              example:
+                id: de305d54-75b4-431b-adb2-eb6b9e546014
+                name: Daft Punk
+                aliases:
+                  - Darlin'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: The artist name or an alias conflicts with existing catalogue data.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: https://api.example.com/problems/artist-alias-conflict
+                title: Conflict
+                status: 409
+                detail: The artist alias already exists
+                code: ARTIST_ALIAS_CONFLICT
+
+  /api/v1/artists/{artistId}:
+    patch:
+      tags: [Artists]
+      operationId: renameArtist
+      summary: Rename an artist
+      description: |
+        Changes the canonical artist name. By default the previous name is retained
+        as an alias; set `preservePreviousNameAsAlias` to `false` to disable this.
+      parameters:
+        - $ref: '#/components/parameters/ArtistId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameArtistRequest'
+            example:
+              name: Daft Punk Robots
+              preservePreviousNameAsAlias: true
+      responses:
+        '200':
+          description: Artist renamed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistResponse'
+              example:
+                id: de305d54-75b4-431b-adb2-eb6b9e546014
+                name: Daft Punk Robots
+                aliases:
+                  - Darlin'
+                  - Daft Punk
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/ArtistNotFound'
+        '409':
+          description: The new name conflicts with an existing artist alias.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: https://api.example.com/problems/artist-alias-conflict
+                title: Conflict
+                status: 409
+                detail: The artist alias already exists
+                code: ARTIST_ALIAS_CONFLICT
+
+  /api/v1/artists/{artistId}/tracks:
+    post:
+      tags: [Tracks]
+      operationId: addTrack
+      summary: Add a track to an artist
+      parameters:
+        - $ref: '#/components/parameters/ArtistId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrackRequest'
+            example:
+              title: Around the World
+              genre: House
+              durationMs: 429533
+              releaseDate: '1997-03-17'
+              albumName: Homework
+              isrc: GBDUW0000059
+      responses:
+        '201':
+          description: Track created successfully.
+          headers:
+            Location:
+              description: URL of the created track.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackResponse'
+              example:
+                id: 2c1a52ef-6187-4f34-a001-e4bfa29f6ec8
+                title: Around the World
+                genre: House
+                durationMs: 429533
+                releaseDate: '1997-03-17'
+                albumName: Homework
+                isrc: GBDUW0000059
+                createdAt: '2026-08-05T13:00:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/ArtistNotFound'
+        '409':
+          description: Another track already uses the supplied ISRC.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: https://api.example.com/problems/track-isrc-conflict
+                title: Conflict
+                status: 409
+                detail: A track with this ISRC already exists
+                code: TRACK_ISRC_CONFLICT
+    get:
+      tags: [Tracks]
+      operationId: listArtistTracks
+      summary: List an artist's tracks
+      description: Returns tracks newest first using zero-based pagination.
+      parameters:
+        - $ref: '#/components/parameters/ArtistId'
+        - name: page
+          in: query
+          description: Zero-based page number.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+        - name: size
+          in: query
+          description: Number of tracks per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          example: 50
+      responses:
+        '200':
+          description: A page of tracks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackPage'
+        '400':
+          $ref: '#/components/responses/ParameterValidationError'
+        '404':
+          $ref: '#/components/responses/ArtistNotFound'
+
+  /api/v1/artists/artist-of-the-day:
+    get:
+      tags: [Artist of the Day]
+      operationId: getArtistOfTheDay
+      summary: Get today's featured artist
+      description: |
+        Returns the artist assigned to the current UTC date. Repeated requests on
+        the same date return the same persisted selection.
+      responses:
+        '200':
+          description: Today's featured artist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistOfTheDayResponse'
+              example:
+                date: '2026-08-05'
+                artist:
+                  id: de305d54-75b4-431b-adb2-eb6b9e546014
+                  name: Daft Punk
+                  aliases:
+                    - Darlin'
+        '404':
+          description: The artist catalogue is empty.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: https://api.example.com/problems/artist-catalogue-empty
+                title: Not Found
+                status: 404
+                detail: Artist of the Day is unavailable because the catalogue is empty
+                code: ARTIST_CATALOGUE_EMPTY
+
+components:
+  parameters:
+    ArtistId:
+      name: artistId
+      in: path
+      description: Unique identifier of the artist.
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: de305d54-75b4-431b-adb2-eb6b9e546014
+
+  responses:
+    ValidationError:
+      description: The JSON request body failed validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblemDetail'
+          example:
+            type: https://api.example.com/problems/validation-failed
+            title: Bad Request
+            status: 400
+            detail: Request validation failed
+            code: VALIDATION_FAILED
+            errors:
+              title: must not be blank
+              durationMs: must be greater than or equal to 1
+    ParameterValidationError:
+      description: A path or query parameter failed validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.example.com/problems/validation-failed
+            title: Bad Request
+            status: 400
+            detail: Request parameter validation failed
+            code: VALIDATION_FAILED
+    ArtistNotFound:
+      description: No artist exists with the supplied identifier.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: https://api.example.com/problems/artist-not-found
+            title: Not Found
+            status: 404
+            detail: No artist exists with id de305d54-75b4-431b-adb2-eb6b9e546014
+            code: ARTIST_NOT_FOUND
+
+  schemas:
+    CreateArtistRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Canonical artist name.
+          minLength: 1
+          maxLength: 200
+          example: Daft Punk
+        aliases:
+          type: array
+          description: Optional alternative or historical artist names.
+          nullable: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+          example:
+            - Darlin'
+
+    RenameArtistRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: New canonical artist name.
+          minLength: 1
+          maxLength: 200
+          example: Daft Punk Robots
+        preservePreviousNameAsAlias:
+          type: boolean
+          nullable: true
+          default: true
+          description: Retain the previous canonical name as an alias. A missing or null value behaves as true.
+
+    ArtistResponse:
+      type: object
+      required: [id, name, aliases]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: de305d54-75b4-431b-adb2-eb6b9e546014
+        name:
+          type: string
+          example: Daft Punk
+        aliases:
+          type: array
+          items:
+            type: string
+          example:
+            - Darlin'
+
+    AddTrackRequest:
+      type: object
+      required: [title, genre, durationMs]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: Around the World
+        genre:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: House
+        durationMs:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 86400000
+          description: Track duration in milliseconds.
+          example: 429533
+        releaseDate:
+          type: string
+          format: date
+          nullable: true
+          description: Release date, which cannot be in the future.
+          example: '1997-03-17'
+        albumName:
+          type: string
+          maxLength: 300
+          nullable: true
+          example: Homework
+        isrc:
+          type: string
+          pattern: '^[A-Za-z]{2}[A-Za-z0-9]{3}[0-9]{7}$'
+          nullable: true
+          description: Optional 12-character International Standard Recording Code.
+          example: GBDUW0000059
+
+    TrackResponse:
+      type: object
+      required: [id, title, genre, durationMs, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Around the World
+        genre:
+          type: string
+          example: House
+        durationMs:
+          type: integer
+          format: int32
+          example: 429533
+        releaseDate:
+          type: string
+          format: date
+          nullable: true
+          example: '1997-03-17'
+        albumName:
+          type: string
+          nullable: true
+          example: Homework
+        isrc:
+          type: string
+          nullable: true
+          example: GBDUW0000059
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-08-05T13:00:00Z'
+
+    TrackPage:
+      type: object
+      required: [content, pageable, totalPages, totalElements, last, size, number, sort, numberOfElements, first, empty]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackResponse'
+        pageable:
+          $ref: '#/components/schemas/Pageable'
+        totalPages:
+          type: integer
+          format: int32
+          example: 1
+        totalElements:
+          type: integer
+          format: int64
+          example: 1
+        last:
+          type: boolean
+          example: true
+        size:
+          type: integer
+          format: int32
+          example: 50
+        number:
+          type: integer
+          format: int32
+          example: 0
+        sort:
+          $ref: '#/components/schemas/Sort'
+        numberOfElements:
+          type: integer
+          format: int32
+          example: 1
+        first:
+          type: boolean
+          example: true
+        empty:
+          type: boolean
+          example: false
+
+    Pageable:
+      type: object
+      required: [pageNumber, pageSize, sort, offset, paged, unpaged]
+      properties:
+        pageNumber:
+          type: integer
+          format: int32
+          example: 0
+        pageSize:
+          type: integer
+          format: int32
+          example: 50
+        sort:
+          $ref: '#/components/schemas/Sort'
+        offset:
+          type: integer
+          format: int64
+          example: 0
+        paged:
+          type: boolean
+          example: true
+        unpaged:
+          type: boolean
+          example: false
+
+    Sort:
+      type: object
+      required: [empty, sorted, unsorted]
+      properties:
+        empty:
+          type: boolean
+          example: false
+        sorted:
+          type: boolean
+          example: true
+        unsorted:
+          type: boolean
+          example: false
+
+    ArtistOfTheDayResponse:
+      type: object
+      required: [date, artist]
+      properties:
+        date:
+          type: string
+          format: date
+          description: UTC date for this selection.
+          example: '2026-08-05'
+        artist:
+          $ref: '#/components/schemas/ArtistResponse'
+
+    ProblemDetail:
+      type: object
+      required: [type, title, status, detail, code]
+      description: RFC 9457 problem detail returned when an API request fails.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Stable URI identifying the problem type.
+        title:
+          type: string
+          description: HTTP status reason phrase.
+        status:
+          type: integer
+          format: int32
+          description: HTTP response status.
+        detail:
+          type: string
+          description: Human-readable explanation of this occurrence.
+        instance:
+          type: string
+          format: uri
+          nullable: true
+        code:
+          type: string
+          description: Stable application-specific error code.
+
+    ValidationProblemDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetail'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              description: Validation message keyed by request field name.
+              additionalProperties:
+                type: string

@@ -53,6 +53,8 @@ docker compose down --volumes
 
 The Swagger UI documents request validation, response schemas, pagination, and error responses for every API operation. The raw OpenAPI document is available from `/api-docs` for client generation and API tooling.
 
+A standalone specification is available at [`docs/openapi.yaml`](docs/openapi.yaml). It can be shared without running the service or pasted directly into [Swagger Editor](https://editor.swagger.io/) to browse and test the API contract.
+
 Create an artist:
 
 ```bash
